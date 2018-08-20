@@ -12,7 +12,7 @@ from simple_rl.agents.AgentClass import Agent
 class QLearningAgent(Agent):
     ''' Implementation for a Q Learning Agent '''
 
-    def __init__(self, actions, name="Q-learning", alpha=0.1, gamma=0.99, epsilon=0.1, explore="uniform", anneal=False):
+    def __init__(self, actions, name="Q-learning", default_q = 0.0, alpha=0.1, gamma=0.99, epsilon=0.1, explore="uniform", anneal=False, printer=None):
         '''
         Args:
             actions (list): Contains strings denoting the actions.
@@ -30,7 +30,8 @@ class QLearningAgent(Agent):
         self.epsilon, self.epsilon_init = epsilon, epsilon
         self.step_number = 0
         self.anneal = anneal
-        self.default_q = 0 #1 / (1 - self.gamma)
+        self.printer = printer
+        self.default_q = default_q
         self.explore = explore
 
         # Q Function:
@@ -131,7 +132,14 @@ class QLearningAgent(Agent):
         # Update the Q Function.
         max_q_curr_state = self.get_max_q_value(next_state)
         prev_q_val = self.get_q_value(state, action)
-        self.q_func[state][action] = (1 - self.alpha) * prev_q_val + self.alpha * (reward + self.gamma*max_q_curr_state)
+        self.q_func[state][action] = (1. - self.alpha) * prev_q_val + self.alpha * (reward + self.gamma*max_q_curr_state)
+        #if self.step_number > 1000000 and self.step_number % 10 == 0:
+        #if next_state.is_terminal():
+        #if state.x == 8 and state.y == 8:
+        #    print(state)
+        #    print(action, reward)
+        #    print('next', next_state)
+        #    print("{} - {} {} {} ==> {}".format(self.step_number, max_q_curr_state, prev_q_val, reward + self.gamma*max_q_curr_state, self.q_func[state][action]))
 
     def _anneal(self):
         # Taken from "Note on learning rate schedules for stochastic optimization, by Darken and Moody (Yale)":
@@ -236,5 +244,8 @@ class QLearningAgent(Agent):
         '''
         if self.anneal:
             self._anneal()
+        if self.printer:
+            self.printer(self.episode_number, self)
+
         Agent.end_of_episode(self)
 

@@ -220,7 +220,9 @@ def run_agents_on_mdp(agents,
                         open_plot=True,
                         verbose=False,
                         reset_at_terminal=False,
-                        cumulative_plot=True):
+                        reset_after_instance=True,
+                        cumulative_plot=True,
+                        update_at_terminal=False):
     '''
     Args:
         agents (list of Agents): See agents/AgentClass.py (and friends).
@@ -267,10 +269,11 @@ def run_agents_on_mdp(agents,
         for instance in range(1, instances + 1):
             print("  Instance " + str(instance) + " of " + str(instances) + ".")
             sys.stdout.flush()
-            run_single_agent_on_mdp(agent, mdp, episodes, steps, experiment, verbose, track_disc_reward, reset_at_terminal=reset_at_terminal)
+            run_single_agent_on_mdp(agent, mdp, episodes, steps, experiment, verbose, track_disc_reward, reset_at_terminal=reset_at_terminal, update_at_terminal=update_at_terminal)
             
             # Reset the agent.
-            agent.reset()
+            if reset_after_instance:
+              agent.reset()
             mdp.end_of_instance()
 
         # Track how much time this agent took.
@@ -286,7 +289,7 @@ def run_agents_on_mdp(agents,
 
     experiment.make_plots(open_plot=open_plot)
 
-def run_single_agent_on_mdp(agent, mdp, episodes, steps, experiment=None, verbose=False, track_disc_reward=False, reset_at_terminal=False, resample_at_terminal=False):
+def run_single_agent_on_mdp(agent, mdp, episodes, steps, experiment=None, verbose=False, track_disc_reward=False, reset_at_terminal=False, resample_at_terminal=False, update_at_terminal=False):
     '''
     Summary:
         Main loop of a single MDP experiment.
@@ -351,6 +354,9 @@ def run_single_agent_on_mdp(agent, mdp, episodes, steps, experiment=None, verbos
                 experiment.add_experience(agent, state, action, reward_to_track, next_state, time_taken=time.clock() - step_start)
 
             if next_state.is_terminal():
+                if update_at_terminal:
+                    agent.update(state, action, reward, next_state)
+                    agent.prev_state = None
                 if reset_at_terminal:
                     # Reset the MDP.
                     next_state = mdp.get_init_state()
