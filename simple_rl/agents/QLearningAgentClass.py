@@ -9,10 +9,12 @@ from collections import defaultdict
 # Other imports.
 from simple_rl.agents.AgentClass import Agent
 
+
+
 class QLearningAgent(Agent):
     ''' Implementation for a Q Learning Agent '''
 
-    def __init__(self, actions, name="Q-learning", default_q = 0.0, alpha=0.1, gamma=0.99, epsilon=0.1, explore="uniform", anneal=False, printer=None):
+    def __init__(self, actions, name="Q-learning", default_q = 0.0, alpha=0.1, gamma=0.99, epsilon=0.1, explore="uniform", anneal=False, printer=None, zero_at_terminal=False, random_opt='normal'):
         '''
         Args:
             actions (list): Contains strings denoting the actions.
@@ -35,7 +37,15 @@ class QLearningAgent(Agent):
         self.explore = explore
 
         # Q Function:
-        self.q_func = defaultdict(lambda : defaultdict(lambda: self.default_q))
+        if isinstance(default_q, tuple):
+            if random_opt == 'normal':
+                self.q_func = defaultdict(lambda : defaultdict(lambda: numpy.random.normal(default_q[0], default_q[1])))
+            elif random_opt == 'uniform':
+                self.q_func = defaultdict(lambda : defaultdict(lambda: numpy.random.uniform(default_q[0], default_q[1])))
+            else:
+                raise NotImplementedError('{} random option is not implemented.'.format(random_opt))
+        else:
+            self.q_func = defaultdict(lambda : defaultdict(lambda: self.default_q))
         # Key: state
         # Val: dict
             #   Key: action
@@ -133,13 +143,6 @@ class QLearningAgent(Agent):
         max_q_curr_state = self.get_max_q_value(next_state)
         prev_q_val = self.get_q_value(state, action)
         self.q_func[state][action] = (1. - self.alpha) * prev_q_val + self.alpha * (reward + self.gamma*max_q_curr_state)
-        #if self.step_number > 1000000 and self.step_number % 10 == 0:
-        #if next_state.is_terminal():
-        #if state.x == 8 and state.y == 8:
-        #    print(state)
-        #    print(action, reward)
-        #    print('next', next_state)
-        #    print("{} - {} {} {} ==> {}".format(self.step_number, max_q_curr_state, prev_q_val, reward + self.gamma*max_q_curr_state, self.q_func[state][action]))
 
     def _anneal(self):
         # Taken from "Note on learning rate schedules for stochastic optimization, by Darken and Moody (Yale)":
@@ -208,6 +211,8 @@ class QLearningAgent(Agent):
         Returns:
             (float): denoting the q value of the (@state, @action) pair.
         '''
+        if state.is_terminal():
+            return 0.0
         return self.q_func[state][action]
 
     def get_action_distr(self, state, beta=0.2):
