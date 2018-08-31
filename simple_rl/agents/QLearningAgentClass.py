@@ -14,7 +14,7 @@ from simple_rl.agents.AgentClass import Agent
 class QLearningAgent(Agent):
     ''' Implementation for a Q Learning Agent '''
 
-    def __init__(self, actions, name="Q-learning", default_q = 0.0, alpha=0.1, gamma=0.99, epsilon=0.1, explore="uniform", anneal=False, printer=None, zero_at_terminal=False, random_opt='normal'):
+    def __init__(self, actions, name="Q-learning", default_q = 0.0, alpha=0.1, gamma=0.99, epsilon=0.1, explore="uniform", anneal=False, printer=None, zero_at_terminal=False, random_opt='normal', count_visits=False):
         '''
         Args:
             actions (list): Contains strings denoting the actions.
@@ -29,7 +29,16 @@ class QLearningAgent(Agent):
 
         # Set/initialize parameters and other relevant classwide data
         self.alpha, self.alpha_init = alpha, alpha
-        self.epsilon, self.epsilon_init = epsilon, epsilon
+        if isinstance(epsilon, float):
+            self.epsilon, self.epsilon_init, self.epsilon_final = epsilon, epsilon, epsilon
+            self.epsilon_discount_per_action = 0.0
+        elif isinstance(epsilon, tuple) and len(epsilon) == 3:
+            self.epsilon = epsilon[0]
+            self.epsilon_init = epsilon[0]
+            self.epsilon_final = epsilon[1]
+            self.epsilon_discount_per_action = epsilon[2]
+        else:
+            raise NotImplementedError
         self.step_number = 0
         self.anneal = anneal
         self.printer = printer
@@ -37,6 +46,7 @@ class QLearningAgent(Agent):
         self.explore = explore
 
         # Q Function:
+        self.random_opt = random_opt
         if isinstance(default_q, tuple):
             if random_opt == 'normal':
                 self.q_func = defaultdict(lambda : defaultdict(lambda: numpy.random.normal(default_q[0], default_q[1])))
@@ -46,12 +56,27 @@ class QLearningAgent(Agent):
                 raise NotImplementedError('{} random option is not implemented.'.format(random_opt))
         else:
             self.q_func = defaultdict(lambda : defaultdict(lambda: self.default_q))
+
+        if count_visits:
+            self.v_counts = defaultdict(lambda : 0)
+        else:
+            self.v_counts = None
+
         # Key: state
         # Val: dict
             #   Key: action
             #   Val: q-value
 
 
+    def reset_epsilon(self, epsilon):
+        if isinstance(epsilon, float):
+            self.epsilon, self.epsilon_init, self.epsilon_final = epsilon, epsilon, epsilon
+            self.epsilon_discount_per_action = 0.0
+        elif isinstance(epsilon, tuple) and len(epsilon) == 3:
+            self.epsilon = epsilon[0]
+            self.epsilon_init = epsilon[0]
+            self.epsilon_final = epsilon[1]
+            self.epsilon_discount_per_action = epsilon[2]
     # --------------------------------
     # ---- CENTRAL ACTION METHODS ----
     # --------------------------------
@@ -71,6 +96,7 @@ class QLearningAgent(Agent):
             and performs updates given (s=self.prev_state,
             a=self.prev_action, r=reward, s'=state)
         '''
+
         if learning:
             self.update(self.prev_state, self.prev_action, reward, state)
         
@@ -88,6 +114,8 @@ class QLearningAgent(Agent):
         # Anneal params.
         if learning and self.anneal:
             self._anneal()
+        if learning :
+            self.epsilon -= self.epsilon_discount_per_action
 
         return action
 
@@ -138,6 +166,9 @@ class QLearningAgent(Agent):
         if state is None:
             self.prev_state = next_state
             return
+
+        if self.v_counts is not None:
+            self.v_counts[state] = self.v_counts[state] + 1
 
         # Update the Q Function.
         max_q_curr_state = self.get_max_q_value(next_state)
@@ -202,6 +233,9 @@ class QLearningAgent(Agent):
         '''
         return self.get_max_q_value(state)
 
+    def get_v_counts(self, state):
+        return self.v_counts[state]
+
     def get_q_value(self, state, action):
         '''
         Args:
@@ -239,7 +273,17 @@ class QLearningAgent(Agent):
     def reset(self):
         self.step_number = 0
         self.episode_number = 0
-        self.q_func = defaultdict(lambda : defaultdict(lambda: self.default_q))
+        if isinstance(self.default_q, tuple):
+            if self.random_opt == 'normal':
+                self.q_func = defaultdict(lambda : defaultdict(lambda: numpy.random.normal(self.default_q[0], self.default_q[1])))
+            elif self.random_opt == 'uniform':
+                self.q_func = defaultdict(lambda : defaultdict(lambda: numpy.random.uniform(self.default_q[0], self.default_q[1])))
+            else:
+                raise NotImplementedError('{} random option is not implemented.'.format(self.random_opt))
+        else:
+            self.q_func = defaultdict(lambda : defaultdict(lambda: self.default_q))
+        if self.v_counts is not None:
+            self.v_counts = defaultdict(lambda : 0)
         Agent.reset(self)
 
     def end_of_episode(self):
