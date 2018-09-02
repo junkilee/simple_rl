@@ -286,14 +286,14 @@ class QLearningAgent(Agent):
             self.v_counts = defaultdict(lambda : 0)
         Agent.reset(self)
 
-    def end_of_episode(self):
+    def end_of_episode(self, testing = False):
         '''
         Summary:
             Resets the agents prior pointers.
         '''
         if self.anneal:
             self._anneal()
-        if self.printer:
+        if self.printer and not testing:
             self.printer(self.episode_number, self)
 
         Agent.end_of_episode(self)
